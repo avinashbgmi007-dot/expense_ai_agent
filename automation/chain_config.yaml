@@ -1,0 +1,472 @@
+# ⛓️ AUTOMATION CHAIN CONFIGURATION
+# This file defines the sequence of .md files and code generation tasks
+# The system will process each step, verify, and move to the next
+
+project_name: "Her - AI Expense Tracker"
+project_root: "c:\\Users\\Avinash-Pro\\Documents\\work_space\\expense_ai_agent"
+ai_model: "codellama:13b-instruct"
+ai_endpoint: "http://localhost:11434"
+
+# ============================================================================
+# PHASE 1: DATA MODELS & DATABASE (Day 1)
+# ============================================================================
+phase_1:
+  name: "Data Models & Database Extension"
+  description: "Create foundation models and extend database schema"
+  source_md: "EXACT_CODE_CHANGES_DAY1.md"
+  architecture_md: "TECHNICAL_ARCHITECTURE.md"
+  
+  tasks:
+    - task_id: "1.1"
+      name: "Update TransactionModel"
+      target_file: "lib/models/transaction.dart"
+      language: "dart"
+      source_section: "FILE 1: Update lib/models/transaction.dart"
+      changes:
+        - action: "add_fields"
+          fields:
+            - "uploadId: String"
+            - "createdAt: DateTime"
+            - "isIgnored: bool"
+            - "userNote: String?"
+        - action: "update_method"
+          methods: ["constructor", "toMap()", "fromMap()"]
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+        - command: "dart format --set-exit-if-changed"
+          expected: "0 changes needed"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "1.2"
+      name: "Create SubscriptionModel"
+      target_file: "lib/models/subscription.dart"
+      language: "dart"
+      source_section: "FILE 2: Create lib/models/subscription.dart"
+      action: "create_file"
+      dependencies:
+        - "1.1"  # Requires TransactionModel to be updated first
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "1.3"
+      name: "Create MonthlySummary Model"
+      target_file: "lib/models/monthly_summary.dart"
+      language: "dart"
+      source_section: "FILE 3: Create lib/models/monthly_summary.dart"
+      action: "create_file"
+      dependencies:
+        - "1.1"
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "1.4"
+      name: "Create SpendingCategory Model"
+      target_file: "lib/models/spending_category.dart"
+      language: "dart"
+      source_section: "FILE 4: Create lib/models/spending_category.dart"
+      action: "create_file"
+      dependencies:
+        - "1.1"
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "1.5"
+      name: "Update DatabaseService"
+      target_file: "lib/services/database_service.dart"
+      language: "dart"
+      source_section: "FILE 5: Update lib/services/database_service.dart"
+      action: "update_file"
+      dependencies:
+        - "1.2"
+        - "1.3"
+      changes:
+        - action: "add_import"
+          import: "import 'package:expense_ai_agent/models/subscription.dart';"
+        - action: "add_methods"
+          methods: ["_createSubscriptionsTable()", "_createMonthlySummaryTable()", "insertSubscription()", "getAllSubscriptions()"]
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "1.6"
+      name: "Update main.dart Imports"
+      target_file: "lib/main.dart"
+      language: "dart"
+      source_section: "Update main.dart to import new models"
+      action: "update_file"
+      dependencies:
+        - "1.2"
+        - "1.3"
+        - "1.4"
+      changes:
+        - action: "add_imports"
+          imports:
+            - "import 'package:expense_ai_agent/models/subscription.dart';"
+            - "import 'package:expense_ai_agent/models/monthly_summary.dart';"
+            - "import 'package:expense_ai_agent/models/spending_category.dart';"
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "1.7"
+      name: "Verify Phase 1 Compilation"
+      action: "verify_phase"
+      dependencies:
+        - "1.1"
+        - "1.2"
+        - "1.3"
+        - "1.4"
+        - "1.5"
+        - "1.6"
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+        - command: "flutter pub get"
+          expected: "success"
+        - command: "flutter build apk --analyze-size"
+          expected: "build successful"
+      on_error: "report_errors_and_stop"
+      retry_count: 0
+
+# ============================================================================
+# PHASE 2: CATEGORIZATION SERVICE (Day 2)
+# ============================================================================
+phase_2:
+  name: "Categorization Service Implementation"
+  description: "Build merchant keyword categorization with 3-level matching"
+  source_md: "DETAILED_IMPLEMENTATION_PLAN.md"
+  architecture_md: "TECHNICAL_ARCHITECTURE.md"
+  
+  dependencies:
+    - "phase_1"  # Must complete Phase 1 first
+  
+  tasks:
+    - task_id: "2.1"
+      name: "Create CategorizationService"
+      target_file: "lib/services/categorization_service.dart"
+      language: "dart"
+      source_section: "DETAILED_IMPLEMENTATION_PLAN.md -> Days 2-3: Create Categorization Service"
+      action: "create_file"
+      instructions: |
+        Create CategorizationService with:
+        1. 200+ Indian merchant keywords database
+        2. categorizeTransaction() method
+        3. _matchByKeywords() - Level 1 matching
+        4. _matchByAmount() - Level 2 heuristic
+        5. _categorizeWithAI() - Level 3 fallback
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "2.2"
+      name: "Add Unit Tests for Categorization"
+      target_file: "test/services/categorization_service_test.dart"
+      language: "dart"
+      action: "create_file"
+      dependencies:
+        - "2.1"
+      instructions: |
+        Create unit tests:
+        1. Test Swiggy → food
+        2. Test Uber → transport
+        3. Test Netflix → subscriptions
+        4. Test unknown → miscellaneous
+        5. Test edge cases (lowercase, spaces, typos)
+      verify:
+        - command: "flutter test test/services/categorization_service_test.dart"
+          expected: "all tests pass"
+      on_error: "request_ai_fix"
+      retry_count: 1
+
+# ============================================================================
+# PHASE 3: LEAK DETECTION SERVICE (Day 3)
+# ============================================================================
+phase_3:
+  name: "Leak Detection Service"
+  description: "Detect recurring subscriptions and small spending leaks"
+  source_md: "DETAILED_IMPLEMENTATION_PLAN.md"
+  
+  dependencies:
+    - "phase_2"
+  
+  tasks:
+    - task_id: "3.1"
+      name: "Create LeakDetectionService"
+      target_file: "lib/services/leak_detection_service.dart"
+      language: "dart"
+      action: "create_file"
+      instructions: |
+        Create LeakDetectionService with:
+        1. detectRecurringTransactions() - Group by merchant+amount, find patterns
+        2. detectSmallDrains() - Find ₹50-₹500 daily spends
+        3. _inferFrequency() - Calculate from gaps
+        4. _calculateStdDev() - Confidence scoring
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+
+# ============================================================================
+# PHASE 4: INSIGHT GENERATOR SERVICE (Day 4)
+# ============================================================================
+phase_4:
+  name: "Insight Generator Service"
+  description: "Generate 7-10 AI insights per month"
+  source_md: "DETAILED_IMPLEMENTATION_PLAN.md"
+  
+  dependencies:
+    - "phase_3"
+  
+  tasks:
+    - task_id: "4.1"
+      name: "Create InsightGeneratorService"
+      target_file: "lib/services/insight_generator_service.dart"
+      language: "dart"
+      action: "create_file"
+      instructions: |
+        Create InsightGeneratorService with:
+        1. generateInsights() - Main method
+        2. _isFestivalSeason() - India festival detection
+        3. _predictRunway() - Calculate months remaining
+        4. _getSpendingPattern() - Week-over-week trends
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+
+# ============================================================================
+# PHASE 5: STATE MANAGEMENT (Day 5)
+# ============================================================================
+phase_5:
+  name: "Analytics Provider & State Management"
+  description: "Central state management with Provider pattern"
+  source_md: "DETAILED_IMPLEMENTATION_PLAN.md"
+  
+  dependencies:
+    - "phase_4"
+  
+  tasks:
+    - task_id: "5.1"
+      name: "Create AnalyticsProvider"
+      target_file: "lib/providers/analytics_provider.dart"
+      language: "dart"
+      action: "create_file"
+      instructions: |
+        Create AnalyticsProvider (ChangeNotifier) with:
+        1. loadAnalytics() - Load and process all data
+        2. getSpendingByCategory() - Category breakdown
+        3. getTopMerchants() - Top 5 merchants
+        4. getLeaks() - Leak detection results
+        5. getSubscriptions() - Active subscriptions
+        6. getInsights() - Generated insights
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "5.2"
+      name: "Update HomeScreen with Provider"
+      target_file: "lib/screens/home_screen.dart"
+      language: "dart"
+      action: "update_file"
+      dependencies:
+        - "5.1"
+      instructions: |
+        Update HomeScreen to:
+        1. Wire AnalyticsProvider
+        2. Load data on init
+        3. Display loading state
+        4. Show results once ready
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+
+# ============================================================================
+# PHASE 6: UI SCREENS & WIDGETS (Day 6)
+# ============================================================================
+phase_6:
+  name: "Dashboard UI & Reusable Widgets"
+  description: "Build analytics screens and reusable components"
+  source_md: "DETAILED_IMPLEMENTATION_PLAN.md"
+  
+  dependencies:
+    - "phase_5"
+  
+  tasks:
+    - task_id: "6.1"
+      name: "Create AnalyticsScreen"
+      target_file: "lib/screens/analytics_screen.dart"
+      language: "dart"
+      action: "create_file"
+      dependencies:
+        - "5.1"
+      instructions: |
+        Create AnalyticsScreen with:
+        1. Monthly summary card (total spend, days, runway)
+        2. Category pie chart
+        3. Top merchants list
+        4. Insights panel (7+)
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "6.2"
+      name: "Create LeaksScreen"
+      target_file: "lib/screens/leaks_screen.dart"
+      language: "dart"
+      action: "create_file"
+      dependencies:
+        - "5.1"
+      instructions: |
+        Create LeaksScreen with:
+        1. Subscriptions list with toggle
+        2. Monthly impact calculation
+        3. Small drains section
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+    
+    - task_id: "6.3"
+      name: "Create Reusable Widgets"
+      target_file: "lib/widgets"
+      language: "dart"
+      action: "create_file_list"
+      files:
+        - "dashboard_card.dart"
+        - "category_breakdown_chart.dart"
+        - "runway_predictor_widget.dart"
+        - "top_merchants_widget.dart"
+        - "insights_panel.dart"
+        - "subscription_tile.dart"
+      verify:
+        - command: "flutter analyze"
+          expected: "0 errors"
+      on_error: "request_ai_fix"
+      retry_count: 2
+
+# ============================================================================
+# PHASE 7: TESTING & OPTIMIZATION (Day 7)
+# ============================================================================
+phase_7:
+  name: "Testing, Verification & Polish"
+  description: "Comprehensive testing, bug fixes, performance optimization"
+  source_md: "DETAILED_IMPLEMENTATION_PLAN.md"
+  
+  dependencies:
+    - "phase_6"
+  
+  tasks:
+    - task_id: "7.1"
+      name: "Create Comprehensive Tests"
+      target_file: "test"
+      language: "dart"
+      action: "create_test_suite"
+      instructions: |
+        Create tests for:
+        1. Transaction model serialization
+        2. Categorization accuracy (50 test cases)
+        3. Leak detection algorithms
+        4. Insight generation
+        5. Database operations
+        6. UI widget rendering
+      verify:
+        - command: "flutter test"
+          expected: "95%+ pass rate"
+      on_error: "request_ai_fix"
+      retry_count: 1
+    
+    - task_id: "7.2"
+      name: "Performance Testing"
+      action: "verify_performance"
+      dependencies:
+        - "7.1"
+      tests:
+        - test: "Dashboard load time"
+          expected: "< 2 seconds"
+        - test: "Categorization latency"
+          expected: "< 500ms per transaction"
+        - test: "Memory usage with 5K txns"
+          expected: "< 500MB"
+    
+    - task_id: "7.3"
+      name: "Final Compilation & Build"
+      action: "verify_build"
+      dependencies:
+        - "7.2"
+      verify:
+        - command: "flutter clean && flutter pub get"
+          expected: "success"
+        - command: "flutter analyze"
+          expected: "0 errors"
+        - command: "flutter build apk --no-build-name"
+          expected: "build successful"
+
+# ============================================================================
+# VERIFICATION & REPORTING
+# ============================================================================
+verification:
+  enable_phase_verification: true
+  enable_compilation_check: true
+  enable_test_verification: true
+  enable_performance_check: true
+  
+output:
+  log_file: "automation_logs/chain_execution.log"
+  report_file: "automation_logs/chain_report.json"
+  generated_files_dir: "automation_logs/generated_code"
+  error_report_file: "automation_logs/errors.log"
+
+# ============================================================================
+# ERROR HANDLING STRATEGY
+# ============================================================================
+error_handling:
+  on_generation_error: "request_ai_retry"
+  on_compilation_error: "request_ai_fix_with_error_feedback"
+  on_test_failure: "request_ai_debug"
+  max_retries: 3
+  save_failed_attempts: true
+  failed_attempts_dir: "automation_logs/failed_attempts"
+
+# ============================================================================
+# NOTIFICATION & LOGGING
+# ============================================================================
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  console_output: true
+  file_output: true
+  timestamp_format: "%Y-%m-%d %H:%M:%S"
+  include_ai_prompts: false  # Don't log full prompts for privacy
+  include_generated_code: true
+
+notifications:
+  on_phase_complete: true
+  on_error: true
+  on_all_complete: true
+  slack_webhook: false  # Optional
+  email_notifications: false  # Optional

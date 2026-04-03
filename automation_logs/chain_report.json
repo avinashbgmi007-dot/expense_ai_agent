@@ -1,0 +1,128 @@
+{
+  "execution_start": "2026-03-28T10:22:41.379021",
+  "phases": {},
+  "errors": [
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:23:22.843860"
+    },
+    {
+      "type": "FORMAT",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:23:22.846228"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:24:03.299940"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:24:31.186076"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:24:45.847534"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:25:43.369704"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:26:08.379526"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:26:08.381042"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:27:09.044946"
+    },
+    {
+      "type": "FILE_WRITE",
+      "message": "Failed to write lib/services/leak_detection_service.dart",
+      "context": "'charmap' codec can't encode character '\\u20b9' in position 320: character maps to <undefined>",
+      "timestamp": "2026-03-28T10:28:03.120002"
+    },
+    {
+      "type": "TASK_EXECUTION",
+      "message": "Failed to write lib/services/leak_detection_service.dart",
+      "context": "3.1",
+      "timestamp": "2026-03-28T10:28:03.120282"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:28:51.820206"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:29:34.120760"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:30:09.024619"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:31:48.855759"
+    },
+    {
+      "type": "ANALYZE",
+      "message": "[WinError 2] The system cannot find the file specified",
+      "context": "",
+      "timestamp": "2026-03-28T10:33:12.390334"
+    },
+    {
+      "type": "FILE_WRITE",
+      "message": "Failed to write lib/widgets",
+      "context": "[Errno 13] Permission denied: 'c:\\\\Users\\\\Avinash-Pro\\\\Documents\\\\work_space\\\\expense_ai_agent\\\\lib\\\\widgets'",
+      "timestamp": "2026-03-28T10:33:27.020374"
+    },
+    {
+      "type": "TASK_EXECUTION",
+      "message": "Failed to write lib/widgets",
+      "context": "6.3",
+      "timestamp": "2026-03-28T10:33:27.020777"
+    },
+    {
+      "type": "FILE_WRITE",
+      "message": "Failed to write test",
+      "context": "[Errno 13] Permission denied: 'c:\\\\Users\\\\Avinash-Pro\\\\Documents\\\\work_space\\\\expense_ai_agent\\\\test'",
+      "timestamp": "2026-03-28T10:35:15.963096"
+    },
+    {
+      "type": "TASK_EXECUTION",
+      "message": "Failed to write test",
+      "context": "7.1",
+      "timestamp": "2026-03-28T10:35:15.963311"
+    }
+  ],
+  "summary": {},
+  "execution_end": "2026-03-28T10:35:15.964444"
+}

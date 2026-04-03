@@ -1,0 +1,8 @@
+# Requirements for Automation System
+# Install with: pip install -r automation/requirements.txt
+
+pyyaml>=6.0
+requests>=2.28.0
+python-dotenv>=0.20.0
+colorama>=0.4.5
+typer>=0.7.0
