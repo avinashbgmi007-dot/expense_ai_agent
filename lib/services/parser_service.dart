@@ -67,6 +67,10 @@ class ParserService {
         credit: false,
         merchant: description,
         paymentMethod: 'Unknown',
+        uploadId: 'unknown_upload',
+        createdAt: DateTime.now(),
+        isIgnored: false,
+        userNote: null,
       );
     } catch (e) {
       return null;

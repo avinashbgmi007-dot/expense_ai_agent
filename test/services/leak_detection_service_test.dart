@@ -157,7 +157,8 @@ void main() {
       ];
 
       final suggestions = service.suggestLeakReductionActions(transactions);
-      expect(suggestions.isNotEmpty, true);
+      expect(suggestions, isNotEmpty);
+      expect(suggestions.length, greaterThan(0));
     });
 
     test('infers frequency from timestamps', () {

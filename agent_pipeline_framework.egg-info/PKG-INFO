@@ -1,0 +1,256 @@
+Metadata-Version: 2.4
+Name: agent_pipeline_framework
+Version: 0.1.0
+Summary: A robust, generic agent pipeline framework for running sequential agent workflows
+Author-email: Kilo <kilo@example.com>
+License: MIT
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: pydantic>=2.0
+Requires-Dist: loguru>=0.7.0
+Requires-Dist: tqdm>=4.64.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
+Requires-Dist: black>=22.0; extra == "dev"
+Requires-Dist: isort>=5.0; extra == "dev"
+Requires-Dist: mypy>=1.0; extra == "dev"
+
+# Agent Pipeline Framework
+
+A robust, generic agent pipeline framework that can run sequential agent workflows for any project. The framework supports the PL-AR-DEV-CR-QA-TW-DO sequence (Planning, Analysis/Requirements, Development, Code Review, QA, Testing, Deployment, Operations) and is designed to be extensible for custom agent sequences.
+
+## Features
+
+- **Configuration System**: Project-specific configurations via YAML files
+- **Error Handling & Retry**: Automatic retry mechanisms with configurable delays
+- **Logging & Progress Tracking**: Comprehensive logging and real-time progress monitoring
+- **Modular Agent Definitions**: Easy-to-extend agent classes
+- **Sequential Execution Engine**: Reliable pipeline execution with context passing
+- **Result Aggregation & Reporting**: Detailed execution reports in JSON/TXT formats
+- **Scenario Simulation**: Testing and simulation capabilities without real execution
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+## Quick Start
+
+### 1. Define a Pipeline Configuration
+
+Create `config/pipelines/my_pipeline.yaml`:
+
+```yaml
+name: "my_pipeline"
+description: "Custom agent pipeline"
+
+agents:
+  - name: "Planning"
+    description: "Project planning"
+    timeout: 60
+    retry_count: 1
+    retry_delay: 2.0
+
+  - name: "Development"
+    description: "Code development"
+    timeout: 300
+    retry_count: 2
+    retry_delay: 3.0
+
+fail_fast: true
+max_total_time: 1800
+```
+
+### 2. Create Agent Classes
+
+Create agents in the `agents/` directory. Each agent should inherit from `BaseAgent`:
+
+```python
+# agents/custom_agent.py
+from core.agent import BaseAgent, AgentConfig, AgentResult
+
+class CustomAgent(BaseAgent):
+    async def execute(self, context):
+        # Your agent logic here
+        return AgentResult(
+            agent_name=self.config.name,
+            success=True,
+            data={"result": "Agent output"},
+        )
+```
+
+### 3. Run the Pipeline
+
+```python
+from core.engine import ExecutionEngine, EngineConfig
+import asyncio
+
+async def main():
+    config = EngineConfig()
+    engine = ExecutionEngine(config)
+
+    # Execute pipeline
+    results = await engine.execute_pipeline("my_pipeline")
+
+    # Print results
+    for result in results:
+        print(f"{result.agent_name}: {'Success' if result.success else 'Failed'}")
+
+asyncio.run(main())
+```
+
+## Architecture
+
+### Core Components
+
+- **`core/agent.py`**: Base agent classes and result models
+- **`core/pipeline.py`**: Pipeline execution logic with retry and error handling
+- **`core/engine.py`**: Main execution engine for loading and running pipelines
+- **`config/loader.py`**: Configuration loading utilities
+- **`utils/logging.py`**: Logging setup
+- **`utils/progress.py`**: Progress tracking with tqdm
+- **`utils/results.py`**: Result aggregation and reporting
+- **`scenarios/simulator.py`**: Simulation capabilities for testing
+
+### Agent Lifecycle
+
+1. **Initialization**: Agent created with configuration
+2. **Execution**: `execute(context)` called with accumulated context
+3. **Result**: AgentResult returned with success status and data
+4. **Context Update**: Successful agent data merged into pipeline context
+5. **Next Agent**: Context passed to next agent in sequence
+
+## Configuration
+
+### Engine Configuration
+
+```python
+from core.engine import EngineConfig
+
+config = EngineConfig(
+    pipelines_dir="config/pipelines",
+    agents_dir="agents",
+    logging_level="INFO",
+    enable_progress_tracking=True
+)
+```
+
+### Pipeline Configuration
+
+Pipelines are defined in YAML with the following structure:
+
+```yaml
+name: "pipeline_name"
+description: "Pipeline description"
+fail_fast: true  # Stop on first failure
+max_total_time: 1800  # Max execution time in seconds
+
+agents:
+  - name: "AgentName"
+    description: "Agent description"
+    timeout: 60  # Timeout in seconds
+    retry_count: 1  # Number of retries
+    retry_delay: 2.0  # Delay between retries
+```
+
+## Creating Custom Agents
+
+Agents must inherit from `BaseAgent` and implement the `execute` method:
+
+```python
+from core.agent import BaseAgent, AgentConfig, AgentResult
+from typing import Dict, Any
+
+class MyAgent(BaseAgent):
+    async def execute(self, context: Dict[str, Any]) -> AgentResult:
+        try:
+            # Agent logic here
+            result_data = {"output": "Processed data"}
+
+            return AgentResult(
+                agent_name=self.config.name,
+                success=True,
+                data=result_data,
+                metadata={"processed_items": 10}
+            )
+        except Exception as e:
+            return AgentResult(
+                agent_name=self.config.name,
+                success=False,
+                data={},
+                error=str(e)
+            )
+```
+
+## Error Handling
+
+The framework provides comprehensive error handling:
+
+- **Agent Failures**: Automatic retry with configurable counts and delays
+- **Pipeline Failures**: `fail_fast` option to stop on first failure
+- **Timeouts**: Per-agent timeouts to prevent hanging
+- **Logging**: Detailed error logging for debugging
+
+## Simulation & Testing
+
+Use the scenario simulator for testing without real execution:
+
+```python
+from scenarios.simulator import ScenarioSimulator
+
+simulator = ScenarioSimulator(success_rate=0.9, agent_delay=0.1)
+
+# Simulate pipeline execution
+results = await simulator.simulate_pipeline(pipeline_config)
+
+# Test failure scenarios
+results = await simulator.simulate_failure_scenario(pipeline_config, ["FailingAgent"])
+
+# Stress testing
+stats = await simulator.stress_test_pipeline(pipeline_config, iterations=100)
+```
+
+## Reporting
+
+Generate execution reports:
+
+```python
+from utils.results import ResultAggregator
+
+aggregator = ResultAggregator()
+aggregator.add_pipeline_results("pipeline_name", results)
+
+# Get summary
+summary = aggregator.get_summary_report()
+
+# Save reports
+aggregator.save_report("report.json", "json")
+aggregator.save_report("report.txt", "txt")
+```
+
+## Example Project
+
+See the included `config/pipelines/default.yaml` and agents in `agents/` for a complete example implementing the PL-AR-DEV-CR-QA-TW-DO sequence.
+
+## Running Tests
+
+```bash
+pytest tests/
+```
+
+## Contributing
+
+1. Create agent classes in `agents/`
+2. Add pipeline configurations in `config/pipelines/`
+3. Write tests in `tests/`
+4. Update documentation
+
+## License
+
+MIT License

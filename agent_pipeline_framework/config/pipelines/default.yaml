@@ -1,0 +1,54 @@
+name: "default_pipeline"
+description: "Default agent pipeline sequence: Planning -> Analysis/Requirements -> Development -> Code Review -> QA -> Testing -> Deployment -> Operations"
+
+agents:
+  - name: "Planning"
+    description: "Project planning and roadmap creation"
+    timeout: 60
+    retry_count: 1
+    retry_delay: 2.0
+
+  - name: "AnalysisRequirements"
+    description: "Requirements analysis and specification"
+    timeout: 120
+    retry_count: 2
+    retry_delay: 1.5
+
+  - name: "Development"
+    description: "Code development and implementation"
+    timeout: 300
+    retry_count: 1
+    retry_delay: 3.0
+
+  - name: "CodeReview"
+    description: "Code review and quality assessment"
+    timeout: 180
+    retry_count: 1
+    retry_delay: 2.0
+
+  - name: "QA"
+    description: "Quality assurance testing"
+    timeout: 240
+    retry_count: 2
+    retry_delay: 1.0
+
+  - name: "Testing"
+    description: "Integration and system testing"
+    timeout: 200
+    retry_count: 1
+    retry_delay: 2.5
+
+  - name: "Deployment"
+    description: "Production deployment"
+    timeout: 150
+    retry_count: 3
+    retry_delay: 5.0
+
+  - name: "Operations"
+    description: "Post-deployment operations and monitoring"
+    timeout: 60
+    retry_count: 1
+    retry_delay: 1.0
+
+fail_fast: true
+max_total_time: 1800

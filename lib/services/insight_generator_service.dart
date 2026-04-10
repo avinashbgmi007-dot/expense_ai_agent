@@ -15,7 +15,7 @@ class InsightGeneratorService {
     for (final t in transactions) {
       totalSpend += t.amount;
     }
-    insights.add('Total spending: \$${totalSpend.toStringAsFixed(2)}');
+    insights.add('Total spending: ₹${totalSpend.toStringAsFixed(2)}');
 
     // Detect high spending category
     final topMerchant = _findTopMerchant(transactions);

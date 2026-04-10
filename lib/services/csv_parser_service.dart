@@ -68,6 +68,8 @@ class CSVParserService {
         credit: false,
         merchant: merchantStr,
         paymentMethod: 'Unknown',
+        uploadId: 'unknown_upload',
+        createdAt: DateTime.now(),
       );
     } catch (e) {
       return null;
@@ -140,7 +142,12 @@ class CSVParserService {
               // first is year (YYYY-MM-DD or YYYY/MM/DD)
               return DateTime(first, second, third);
             } else if (third > 31) {
-              // third is year (DD-MM-YYYY or MM/DD/YYYY)
+              // third is year - try DD-MM-YYYY first
+              final ddmmyyyy = DateTime(third, second, first);
+              if (ddmmyyyy.day == first && ddmmyyyy.month == second) {
+                return ddmmyyyy;
+              }
+              // Fallback to MM-DD-YYYY
               return DateTime(third, first, second);
             }
           }

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze:*)",
+      "Bash(ls:*)",
+      "Bash(flutter test:*)",
+      "Bash(python /tmp/create_test_pdf.py)",
+      "Bash(python /tmp/test_pdf_extract.py)",
+      "Bash(flutter pub:*)",
+      "Bash(dart pub:*)",
+      "Bash(dart test:*)",
+      "Bash(dart run:*)",
+      "Bash(rm:*)",
+      "Bash(dart analyze:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(rm bin/debug_dummy.dart bin/test_categorization.dart)",
+      "Bash(rm bin/pdf_simulation.dart)",
+      "Bash(file *.pdf)",
+      "Bash(dart:*)",
+      "Bash(grep -E '^[0-9]{2}-[0-9]{2}-[0-9]{4}$' union_extracted.txt)",
+      "Skill(remember)",
+      "Skill(remember:remember)",
+      "Bash(flutter run:*)"
+    ]
+  }
+}

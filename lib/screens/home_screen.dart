@@ -3,7 +3,10 @@ import 'package:provider/provider.dart';
 import '../providers/analytics_provider.dart';
 import '../services/file_upload_service.dart';
 import '../services/csv_parser_service.dart';
+import '../services/pdf_parser_service.dart';
+import '../services/xlsx_parser_service.dart';
 import '../services/database_service.dart';
+import '../utils/app_constants.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,95 +18,96 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FileUploadService _fileUploadService = FileUploadService();
   final CSVParserService _csvParserService = CSVParserService();
+  final PDFParserService _pdfParserService = PDFParserService();
+  final XLSXParserService _xlsxParserService = XLSXParserService();
   final DatabaseService _databaseService = DatabaseService();
   bool _isUploading = false;
 
   @override
   void initState() {
     super.initState();
-    // Load data after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AnalyticsProvider>().loadData();
     });
   }
 
   Future<void> _handleFileUpload() async {
-    try {
-      setState(() => _isUploading = true);
+    setState(() => _isUploading = true);
 
+    try {
       final file = await _fileUploadService.pickFile();
-      if (file == null) {
-        setState(() => _isUploading = false);
+      if (!mounted) return;
+      if (file == null) return;
+
+      final ext = file.path.split('.').last.toLowerCase();
+      List transactions;
+
+      switch (ext) {
+        case 'csv':
+          transactions = await _csvParserService.parseCSV(file);
+          break;
+        case 'pdf':
+          transactions = await _pdfParserService.parsePDF(file);
+          break;
+        case 'xlsx':
+        case 'xls':
+          transactions = await _xlsxParserService.parseXLSX(file);
+          break;
+        default:
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('\u274C Unsupported file format'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+      }
+
+      if (!mounted) return;
+
+      if (transactions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('\u274C No valid transactions found in $ext file'),
+            backgroundColor: Colors.red,
+          ),
+        );
         return;
       }
 
-      // Handle CSV parsing
-      if (file.path.endsWith('.csv')) {
-        final transactions = await _csvParserService.parseCSV(file);
-        if (!mounted) return;
+      await _databaseService.initialize();
 
-        if (transactions.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ No valid transactions found in CSV'),
-            ),
-          );
-          if (mounted) setState(() => _isUploading = false);
-          return;
-        }
-
-        // Initialize database and save each transaction
-        await _databaseService.initialize();
-
-        for (var transaction in transactions) {
-          // Save to database
-          await _databaseService.insertTransaction(transaction);
-        }
-
-        if (!mounted) return;
-
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '✅ Successfully loaded ${transactions.length} transactions from CSV',
-            ),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-
-        // Reload analytics with new data
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          context.read<AnalyticsProvider>().loadData();
-        }
-      } else if (file.path.endsWith('.pdf')) {
-        // PDF Support: Better approach
-        // Proper PDF text extraction requires external libraries
-        // Recommended: Export PDF as CSV from your bank for 99%+ accuracy
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              '📋 PDF Note: Export bank statement as CSV for 99%+ extraction accuracy '
-              'with AI categorization. CSV files are supported.',
-            ),
-            duration: Duration(seconds: 5),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        if (mounted) setState(() => _isUploading = false);
+      for (var transaction in transactions) {
+        await _databaseService.insertTransaction(transaction);
       }
 
-      if (mounted) {
-        setState(() => _isUploading = false);
-      }
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '\u2705 Successfully loaded ${transactions.length} transactions from $ext',
+          ),
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      context.read<AnalyticsProvider>().loadData();
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('\u274C Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
         setState(() => _isUploading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
       }
     }
   }
@@ -112,16 +116,28 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('💰 Expense AI Agent'),
+        title: const Text('Expense AI Agent', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
         actions: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Center(
-              child: Text(
-                '₹ INR',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(color: Colors.white),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Text(
+                    '\u{20B9}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -150,318 +166,41 @@ class _HomeScreenState extends State<HomeScreen> {
           final totalSpend = provider.data['totalSpend'] as double? ?? 0.0;
           final txnCount = provider.data['transactionCount'] as int? ?? 0;
 
-          // Convert maps from dynamic to proper types
-          final spendByCategoryRaw =
-              provider.data['spendByCategory'] as Map? ?? {};
-          final spendByCategory = <String, double>{};
-          spendByCategoryRaw.forEach((key, value) {
-            spendByCategory[key.toString()] = (value is num)
-                ? value.toDouble()
-                : 0.0;
-          });
-
-          final spendByMerchantRaw =
-              provider.data['spendByMerchant'] as Map? ?? {};
-          final spendByMerchant = <String, double>{};
-          spendByMerchantRaw.forEach((key, value) {
-            spendByMerchant[key.toString()] = (value is num)
-                ? value.toDouble()
-                : 0.0;
-          });
+          final spendByCategory = provider.data['spendByCategory'] as Map<String, double>? ?? {};
+          final spendByMerchant = provider.data['spendByMerchant'] as Map<String, double>? ?? {};
 
           final leaks = provider.data['leaks'] as Map<String, dynamic>? ?? {};
-          final subscriptions =
-              provider.data['subscriptions'] as List<dynamic>? ?? [];
+          final subscriptions = provider.data['subscriptions'] as List<dynamic>? ?? [];
+          final insights = provider.data['insights'] as List<dynamic>? ?? [];
 
-          // Calculate empty state
           final isEmpty = txnCount == 0;
 
           return isEmpty
-              ? Center(
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.upload_file,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'No Transactions Yet',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Tap the Upload button below to import your bank statement (CSV format)',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'Sample CSV Format:\nDate,Amount,Merchant,Description\n2024-01-15,500,Swiggy,Food Order',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
+              ? _buildEmptyState()
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // Header
-                    Text(
-                      '📊 Analytics Dashboard',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
+                    _buildSummaryCard(totalSpend, txnCount),
                     const SizedBox(height: 16),
 
-                    // Total Spend Card
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Total Spend',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '₹${totalSpend.toStringAsFixed(2)}',
-                              style: Theme.of(context).textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Transactions: $txnCount',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Spend by Category
                     if (spendByCategory.isNotEmpty)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '📁 Spending by Category',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 12),
-                              ...spendByCategory.entries.map((entry) {
-                                final percentage =
-                                    (entry.value /
-                                    (totalSpend > 0 ? totalSpend : 1) *
-                                    100);
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            entry.key.toUpperCase(),
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            '₹${entry.value.toStringAsFixed(2)} (${percentage.toStringAsFixed(1)}%)',
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: LinearProgressIndicator(
-                                          value: percentage / 100,
-                                          minHeight: 6,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ),
-                      ),
+                      _buildCategoryCard(spendByCategory, totalSpend),
                     const SizedBox(height: 16),
 
-                    // Top Merchants
                     if (spendByMerchant.isNotEmpty)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '🏪 Top Merchants',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 12),
-                              ...spendByMerchant.entries
-                                  .toList()
-                                  .take(5)
-                                  .toList()
-                                  .asMap()
-                                  .entries
-                                  .map((entry) {
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8,
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            '${entry.key + 1}. ${entry.value.key}',
-                                          ),
-                                          Text(
-                                            '₹${entry.value.value.toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }),
-                            ],
-                          ),
-                        ),
-                      ),
+                      _buildMerchantCard(spendByMerchant),
                     const SizedBox(height: 16),
 
-                    // Subscriptions & Leaks
                     if (subscriptions.isNotEmpty)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '🔄 Recurring Charges (Subscriptions)',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 12),
-                              for (
-                                int i = 0;
-                                i <
-                                    (subscriptions.length > 5
-                                        ? 5
-                                        : subscriptions.length);
-                                i++
-                              )
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          subscriptions[i]['merchant'] ??
-                                              'Unknown',
-                                        ),
-                                      ),
-                                      Text(
-                                        '₹${(subscriptions[i]['amount'] ?? 0).toStringAsFixed(2)}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      _buildSubscriptionsCard(subscriptions),
                     const SizedBox(height: 16),
 
-                    // Total Leaks Summary
-                    if (leaks.isNotEmpty)
-                      Card(
-                        color: Colors.orange.shade50,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '⚠️ Potential Leaks Summary',
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(color: Colors.orange.shade700),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Monthly Subscriptions:'),
-                                  Text(
-                                    '₹${(leaks['subscriptions'] ?? 0).toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Small Transactions:'),
-                                  Text(
-                                    '₹${(leaks['smallTransactions'] ?? 0).toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    if (leaks.isNotEmpty && (leaks['total'] ?? 0) > 0)
+                      _buildLeaksCard(leaks),
+                    const SizedBox(height: 16),
+
+                    if (insights.isNotEmpty)
+                      _buildInsightsCard(insights),
                   ],
                 );
         },
@@ -470,16 +209,452 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: _isUploading ? null : _handleFileUpload,
         icon: _isUploading
             ? const SizedBox(
-                height: 24,
-                width: 24,
+                height: 20,
+                width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
-            : const Icon(Icons.upload_file),
-        label: Text(_isUploading ? 'Uploading...' : 'Upload CSV/PDF'),
-        tooltip: 'Upload bank statement or invoice (CSV/PDF)',
+            : const Icon(Icons.upload_file, size: 20),
+        label: Text(_isUploading ? 'Uploading...' : 'Upload'),
+        tooltip: 'Upload bank statement (CSV, PDF, XLSX)',
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFF5F6FA), Color(0xFFE8EDF5)],
+        ),
+      ),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.upload_file,
+                    size: 44,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'No Transactions Yet',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'Tap the Upload button below to import your bank statement and get AI-powered insights',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondaryColor,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.cardOutlineDecoration(),
+                  child: const Text(
+                    'Supported formats: CSV, PDF, XLSX',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(double totalSpend, int txnCount) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        gradient: AppTheme.primaryGradient,
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x401E3A5F),
+            blurRadius: 24,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Total Spend',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white70,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '\u{20B9}${totalSpend.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$txnCount transactions',
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(Map<String, double> spendByCategory, double totalSpend) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.pie_chart, size: 20, color: AppTheme.primaryColor),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Spending by Category',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...spendByCategory.entries.map((entry) {
+            final percentage = (totalSpend > 0 ? (entry.value / totalSpend * 100) : 0.0);
+            final color = AppTheme.categoryColors[entry.key.toLowerCase()] ?? AppTheme.primaryColor;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            entry.key.toUpperCase(),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '\u{20B9}${entry.value.toStringAsFixed(0)}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: percentage / 100,
+                      minHeight: 5,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                      backgroundColor: color.withOpacity(0.12),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMerchantCard(Map<String, double> spendByMerchant) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.store, size: 20, color: AppTheme.secondaryColor),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Top Merchants',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...spendByMerchant.entries.toList().take(5).toList().asMap().entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${entry.key + 1}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      entry.value.key,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  Text(
+                    '\u{20B9}${entry.value.value.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionsCard(List<dynamic> subscriptions) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.categoryColors['subscriptions']!.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.autorenew, size: 20, color: AppTheme.secondaryColor),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Recurring Charges',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (int i = 0; i < (subscriptions.length > 5 ? 5 : subscriptions.length); i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: AppTheme.secondaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      subscriptions[i]['merchant'] ?? 'Unknown',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                  Text(
+                    '\u{20B9}${(subscriptions[i]['amount'] ?? 0).toStringAsFixed(2)}/mo',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeaksCard(Map<String, dynamic> leaks) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.cardDecoration(color: Colors.orange.shade50),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.warning_amber_rounded, size: 20, color: Colors.orange),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Spending Leaks',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.orange),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _leakRow('Subscriptions', leaks['subscriptions'] ?? 0),
+          const SizedBox(height: 6),
+          _leakRow('Small Transactions', leaks['smallTransactions'] ?? 0),
+        ],
+      ),
+    );
+  }
+
+  Widget _leakRow(String label, double amount) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 14)),
+        Text(
+          '\u{20B9}${amount.toStringAsFixed(2)}',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.orange),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInsightsCard(List<dynamic> insights) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.lightbulb_outline, size: 20, color: AppTheme.primaryColor),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'AI Insights',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...insights.map(
+            (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('\u2022  '),
+                  Expanded(
+                    child: Text(
+                      i.toString(),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

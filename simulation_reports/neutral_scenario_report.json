@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-04-11T01:27:40.629387",
+  "total_pipelines": 1,
+  "pipeline_summaries": {
+    "neutral_scenario": {
+      "total_agents": 8,
+      "successful_agents": 7,
+      "failed_agents": 1,
+      "success_rate": 0.875
+    }
+  },
+  "overall": {
+    "total_agents": 8,
+    "successful_agents": 7,
+    "failed_agents": 1,
+    "success_rate": 0.875
+  }
+}
