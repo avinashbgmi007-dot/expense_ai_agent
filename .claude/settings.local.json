@@ -21,7 +21,9 @@
       "Bash(grep -E '^[0-9]{2}-[0-9]{2}-[0-9]{4}$' union_extracted.txt)",
       "Skill(remember)",
       "Skill(remember:remember)",
-      "Bash(flutter run:*)"
+      "Bash(flutter run:*)",
+      "Bash(git commit:*)",
+      "Bash(git add:*)"
     ]
   }
 }
