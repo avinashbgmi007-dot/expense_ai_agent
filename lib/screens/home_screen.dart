@@ -179,21 +179,20 @@ class _HomeScreenState extends State<HomeScreen> {
           final totalSpend = provider.data['totalSpend'] as double? ?? 0.0;
           final txnCount = provider.data['transactionCount'] as int? ?? 0;
 
-          final spendByCategory = provider.data['spendByCategory'] is Map
-              ? provider.getSpendingByCategory()
-              : <String, dynamic>{};
-          final spendByMerchantRaw = provider.data['spendByMerchant'];
-          final spendByMerchant = spendByMerchantRaw is Map
-              ? Map<String, double>.from(
-                  spendByMerchantRaw.map(
-                      (k, v) => MapEntry(k.toString(), (v as num).toDouble())),
-                )
-              : <String, double>{};
+          final rawCategory = provider.data['spendByCategory'];
+          final spendByCategory = _safeMap<String, dynamic>(rawCategory);
+          final rawMerchant = provider.data['spendByMerchant'];
+          final spendByMerchant = _safeMap<String, double>(rawMerchant);
 
-          final leaks = provider.data['leaks'] as Map<String, dynamic>? ?? {};
-          final subscriptions =
-              provider.data['subscriptions'] as List<dynamic>? ?? [];
-          final insights = provider.data['insights'] as List<dynamic>? ?? [];
+          final leaksRaw = provider.data['leaks'];
+          final leaks = _safeMap<String, dynamic>(leaksRaw);
+          final subscriptionsRaw = provider.data['subscriptions'];
+          final subscriptions = subscriptionsRaw is List
+              ? subscriptionsRaw.cast<Map<String, dynamic>>()
+              : <Map<String, dynamic>>[];
+          final insightsRaw = provider.data['insights'];
+          final insights =
+              insightsRaw is List ? insightsRaw.cast<dynamic>() : <dynamic>[];
 
           final isEmpty = txnCount == 0;
 
@@ -686,6 +685,28 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  // Safe helper to cast any map (including Map<dynamic,dynamic>) to the expected type
+  Map<K, V> _safeMap<K, V>(dynamic input) {
+    if (input == null) return <K, V>{};
+    if (input is Map<K, V>) return input;
+    if (input is Map) {
+      final Map<K, V> result = {};
+      input.forEach((key, value) {
+        if (key is K && value is V) {
+          result[key] = value;
+        } else {
+          try {
+            result[key as K] = value as V;
+          } catch (_) {
+            // Skip malformed entries
+          }
+        }
+      });
+      return result;
+    }
+    return <K, V>{};
   }
 
   Widget _buildInsightsCard(List<dynamic> insights) {

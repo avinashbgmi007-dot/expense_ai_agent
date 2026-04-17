@@ -28,7 +28,8 @@ class DatabaseMigrationService {
       await _createBackup(prefs);
 
       // Get existing transaction data
-      final transactionKeys = prefs.getKeys().where((key) => key.startsWith('transaction_'));
+      final transactionKeys =
+          prefs.getKeys().where((key) => key.startsWith('transaction_'));
 
       for (final key in transactionKeys) {
         final transactionData = prefs.getString(key);
@@ -48,7 +49,6 @@ class DatabaseMigrationService {
 
       // Mark migration as completed
       await prefs.setBool(_migrationKey, true);
-
     } catch (e) {
       // Rollback on error
       await rollbackMigration();
@@ -96,7 +96,6 @@ class DatabaseMigrationService {
       );
 
       await database.insert('transactions', transaction.toJson());
-
     } catch (e) {
       // Log error but continue with other transactions
       print('Error migrating transaction: $e');
@@ -130,8 +129,9 @@ class DatabaseMigrationService {
       );
 
       // Basic integrity checks
-      return transactionCount != null && accountCount != null && accountCount > 0;
-
+      return transactionCount != null &&
+          accountCount != null &&
+          accountCount > 0;
     } catch (e) {
       return false;
     }
@@ -159,7 +159,12 @@ class DatabaseMigrationService {
       // Restore from backup
       final backupJson = prefs.getString(_backupKey);
       if (backupJson != null) {
-        final backupData = jsonDecode(backupJson) as Map<String, dynamic>;
+        final rawBackup = jsonDecode(backupJson);
+        // Safe cast: JSON decode can return Map<dynamic,dynamic>
+        if (rawBackup is! Map<String, dynamic>) {
+          throw Exception('Invalid backup format');
+        }
+        final backupData = rawBackup;
 
         for (final entry in backupData.entries) {
           if (entry.key.startsWith('transaction_')) {
@@ -170,7 +175,6 @@ class DatabaseMigrationService {
 
       // Remove migration flag
       await prefs.remove(_migrationKey);
-
     } catch (e) {
       throw Exception('Rollback failed: $e');
     }
