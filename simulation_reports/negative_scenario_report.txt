@@ -1,14 +1,14 @@
 Pipeline Execution Report
 ==================================================
-Generated: 2026-04-11T01:27:34.050872
+Generated: 2026-04-16T04:04:17.766378
 
 Total Pipelines: 1
-Overall Success Rate: 87.50%
+Overall Success Rate: 75.00%
 Total Agents: 8
-Successful: 7
-Failed: 1
+Successful: 6
+Failed: 2
 
 Pipeline: negative_scenario
-  Success Rate: 87.50%
-  Agents: 7/8
+  Success Rate: 75.00%
+  Agents: 6/8
 

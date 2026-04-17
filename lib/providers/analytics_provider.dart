@@ -9,7 +9,8 @@ import '../services/insight_generator_service.dart';
 class AnalyticsProvider with ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   final AnalyzerService _analyzerService = AnalyzerService();
-  final AICategorizationService _categorizationService = AICategorizationService();
+  final AICategorizationService _categorizationService =
+      AICategorizationService();
   final LeakDetectionService _leakDetectionService = LeakDetectionService();
   final InsightGeneratorService _insightService = InsightGeneratorService();
 
@@ -68,11 +69,22 @@ class AnalyticsProvider with ChangeNotifier {
       final leaks = _leakDetectionService.detectLeaks(transactions);
       final insights = _insightService.generateInsights(transactions);
 
+      // Safe cast all maps to prevent Map<dynamic, dynamic> errors
+      final safeSpendByMerchant = spendByMerchant is Map<String, double>
+          ? spendByMerchant
+          : _safeCastMap<String, double>(spendByMerchant);
+      final safeSpendByCategory = spendByCategory is Map<String, dynamic>
+          ? spendByCategory
+          : _safeCastMap<String, dynamic>(spendByCategory);
+      final safeLeaks = leaks is Map<String, dynamic>
+          ? leaks
+          : _safeCastMap<String, dynamic>(leaks);
+
       _analyticsData = {
         'totalSpend': totalSpend,
         'transactionCount': transactions.length,
-        'spendByMerchant': spendByMerchant,
-        'spendByCategory': spendByCategory,
+        'spendByMerchant': safeSpendByMerchant,
+        'spendByCategory': safeSpendByCategory,
         'repeatedTransactions': repeatedTransactions
             .map(
               (t) => {
@@ -83,7 +95,7 @@ class AnalyticsProvider with ChangeNotifier {
             )
             .toList(),
         'upiUsagePercentage': upiUsage,
-        'leaks': leaks,
+        'leaks': safeLeaks,
         'subscriptions': repeatedTransactions
             .map(
               (t) => {
@@ -166,18 +178,37 @@ class AnalyticsProvider with ChangeNotifier {
   }
 
   Map<String, dynamic> getSpendingByCategory() {
-    return _analyticsData['spendByCategory'] ?? {};
+    final spendByCategory = _analyticsData['spendByCategory'];
+    if (spendByCategory is Map<String, dynamic>) {
+      return spendByCategory;
+    }
+    // Handle case where it's Map<dynamic, dynamic> or other type
+    if (spendByCategory is Map) {
+      return _safeCastMap<String, dynamic>(spendByCategory);
+    }
+    return <String, dynamic>{};
   }
 
   List<MapEntry<String, dynamic>> getTopMerchants() {
-    final byMerchant = _analyticsData['spendByMerchant'] as Map<String, dynamic>? ?? {};
-    return byMerchant.entries
-        .toList()
-      ..sort((a, b) => (b.value as num).compareTo(a.value as num));
+    final byMerchant = _analyticsData['spendByMerchant'];
+    if (byMerchant is Map) {
+      final castMap = _safeCastMap<String, dynamic>(byMerchant);
+      return castMap.entries.toList()
+        ..sort((a, b) => (b.value as num).compareTo(a.value as num));
+    }
+    return <MapEntry<String, dynamic>>[];
   }
 
   Map<String, dynamic> getLeaks() {
-    return _analyticsData['leaks'] as Map<String, dynamic>? ?? {};
+    final leaks = _analyticsData['leaks'];
+    if (leaks is Map<String, dynamic>) {
+      return leaks;
+    }
+    // Handle case where it's Map<dynamic, dynamic> or other type
+    if (leaks is Map) {
+      return _safeCastMap<String, dynamic>(leaks);
+    }
+    return <String, dynamic>{};
   }
 
   List<dynamic> getSubscriptions() {
@@ -186,5 +217,36 @@ class AnalyticsProvider with ChangeNotifier {
 
   List<dynamic> getInsights() {
     return _analyticsData['insights'] ?? [];
+  }
+
+  // Helper method to safely cast maps
+  Map<K, V> _safeCastMap<K, V>(dynamic input) {
+    if (input == null) return <K, V>{};
+
+    if (input is Map<K, V>) {
+      return input;
+    }
+
+    if (input is Map) {
+      // Maps between <T> and <U> are not covariant, need safe copy
+      final Map<K, V> result = {};
+      input.forEach((key, value) {
+        if (key is K && value is V) {
+          result[key] = value;
+        } else {
+          // If keys/values don't match expected types, cast (with runtime checks)
+          try {
+            final newKey = key as K;
+            final newValue = value as V;
+            result[newKey] = newValue;
+          } catch (_) {
+            // Skip malformed entries
+          }
+        }
+      });
+      return result;
+    }
+
+    return <K, V>{};
   }
 }

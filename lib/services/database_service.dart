@@ -38,10 +38,37 @@ class DatabaseService {
     }
     try {
       final List<dynamic> decoded = jsonDecode(jsonString);
+
+      // Safe map casting to handle Map<dynamic, dynamic> -> Map<String, dynamic>
       return decoded
-          .map((t) => TransactionModel.fromMap(t as Map<String, dynamic>))
+          .map<TransactionModel?>((t) {
+            try {
+              if (t is Map<String, dynamic>) {
+                return TransactionModel.fromMap(t);
+              } else if (t is Map) {
+                // Convert Map<dynamic, dynamic> to Map<String, dynamic>
+                final Map<String, dynamic> safeMap = {};
+                t.forEach((key, value) {
+                  if (key is String) {
+                    safeMap[key] = value;
+                  } else if (key != null) {
+                    // Only include non-null keys
+                    safeMap[key.toString()] = value;
+                  }
+                });
+                return TransactionModel.fromMap(safeMap);
+              }
+            } catch (e) {
+              print('Error converting transaction map to TransactionModel: $e');
+              return null;
+            }
+            return null;
+          })
+          .where((t) => t != null)
+          .cast<TransactionModel>()
           .toList();
     } catch (e) {
+      print('Error getting transactions: $e');
       return [];
     }
   }
@@ -81,12 +108,36 @@ class DatabaseService {
     if (_prefs == null) return [];
     final String? jsonString = _prefs!.getString(_subscriptionsKey);
     if (jsonString == null || jsonString.isEmpty) return [];
+
     try {
       final List<dynamic> decoded = jsonDecode(jsonString);
       return decoded
-          .map((s) => SubscriptionModel.fromMap(s as Map<String, dynamic>))
+          .map<SubscriptionModel?>((s) {
+            try {
+              if (s is Map<String, dynamic>) {
+                return SubscriptionModel.fromMap(s);
+              } else if (s is Map) {
+                final Map<String, dynamic> safeMap = {};
+                s.forEach((key, value) {
+                  if (key is String) {
+                    safeMap[key] = value;
+                  } else if (key != null) {
+                    safeMap[key.toString()] = value;
+                  }
+                });
+                return SubscriptionModel.fromMap(safeMap);
+              }
+            } catch (e) {
+              print('Error converting subscription map: $e');
+              return null;
+            }
+            return null;
+          })
+          .where((s) => s != null)
+          .cast<SubscriptionModel>()
           .toList();
     } catch (e) {
+      print('Error getting subscriptions: $e');
       return [];
     }
   }
@@ -112,12 +163,36 @@ class DatabaseService {
     if (_prefs == null) return [];
     final String? jsonString = _prefs!.getString(_summariesKey);
     if (jsonString == null || jsonString.isEmpty) return [];
+
     try {
       final List<dynamic> decoded = jsonDecode(jsonString);
       return decoded
-          .map((s) => MonthlySummary.fromMap(s as Map<String, dynamic>))
+          .map<MonthlySummary?>((s) {
+            try {
+              if (s is Map<String, dynamic>) {
+                return MonthlySummary.fromMap(s);
+              } else if (s is Map) {
+                final Map<String, dynamic> safeMap = {};
+                s.forEach((key, value) {
+                  if (key is String) {
+                    safeMap[key] = value;
+                  } else if (key != null) {
+                    safeMap[key.toString()] = value;
+                  }
+                });
+                return MonthlySummary.fromMap(safeMap);
+              }
+            } catch (e) {
+              print('Error converting monthly summary map: $e');
+              return null;
+            }
+            return null;
+          })
+          .where((s) => s != null)
+          .cast<MonthlySummary>()
           .toList();
     } catch (e) {
+      print('Error getting monthly summaries: $e');
       return [];
     }
   }

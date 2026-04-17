@@ -4,22 +4,22 @@ import '../models/transaction.dart';
 /// Enhanced Leak Detection — returns actionable per-item data.
 class LeakDetectionService {
   /// RecurringSubscription item with inferred metadata
-  Map<String, dynamic> _buildSubscriptionInfo(
-    List<TransactionModel> txns,
-  ) {
+  Map<String, dynamic> _buildSubscriptionInfo(List<TransactionModel> txns) {
     final merchant = txns.first.merchant ?? 'Unknown';
     final amount = txns.first.amount;
     final timestamps = txns.map((t) => t.timestamp).toList();
     final frequency = inferFrequency(timestamps);
-    final category = txns.first.category.isNotEmpty ? txns.first.category : 'miscellaneous';
+    final category = txns.first.category.isNotEmpty
+        ? txns.first.category
+        : 'miscellaneous';
     final totalSpent = txns.fold<double>(0, (sum, t) => sum + t.amount);
     final monthlyEstimate = frequency == 'monthly'
         ? amount
         : frequency == 'quarterly'
-            ? amount / 3
-            : frequency == 'annual'
-                ? amount / 12
-                : amount * max(1, txns.length ~/ 3);
+        ? amount / 3
+        : frequency == 'annual'
+        ? amount / 12
+        : amount * max(1, txns.length ~/ 3);
 
     return {
       'merchant': merchant,
@@ -46,16 +46,19 @@ class LeakDetectionService {
   Map<String, dynamic> detectLeaks(List<TransactionModel> transactions) {
     if (transactions.isEmpty) {
       return {
-        'subscriptions': [],
-        'smallTransactions': [],
+        'subscriptions': <dynamic>[],
+        'smallTransactions': <dynamic>[],
         'totalMonthly': 0.0,
         'subscriptionMonthly': 0.0,
         'smallMonthly': 0.0,
-        'suggestions': [],
+        'suggestions': <String>[],
       };
     }
 
-    final recurring = detectRecurringTransactions(transactions, minOccurrences: 2);
+    final recurring = detectRecurringTransactions(
+      transactions,
+      minOccurrences: 2,
+    );
 
     // Group recurring by merchant (exact match on merchant + same amount ±5%)
     final Map<String, List<TransactionModel>> recurringGroups = {};
@@ -67,7 +70,9 @@ class LeakDetectionService {
     // Filter out transfers from subscriptions (person-to-person payments are not "subscriptions")
     recurringGroups.removeWhere((key, txns) {
       final firstCat = txns.isNotEmpty
-          ? (txns.first.category.isNotEmpty ? txns.first.category : 'miscellaneous')
+          ? (txns.first.category.isNotEmpty
+                ? txns.first.category
+                : 'miscellaneous')
           : 'miscellaneous';
       return firstCat == 'transfers' || firstCat == 'income';
     });
@@ -76,15 +81,26 @@ class LeakDetectionService {
         .map((e) => _buildSubscriptionInfo(e.value))
         .toList();
 
-    subscriptions.sort((a, b) => (b['monthlyEstimate'] as num).compareTo(a['monthlyEstimate'] as num));
+    subscriptions.sort(
+      (a, b) =>
+          (b['monthlyEstimate'] as num).compareTo(a['monthlyEstimate'] as num),
+    );
 
     // Small transactions (< ₹200) that are not transfers
     final smallTxns = transactions
-        .where((t) => t.amount < 200 && !t.credit && t.category != 'transfers' && t.category != 'income')
+        .where(
+          (t) =>
+              t.amount < 200 &&
+              !t.credit &&
+              t.category != 'transfers' &&
+              t.category != 'income',
+        )
         .toList();
     smallTxns.sort((a, b) => a.amount.compareTo(b.amount));
 
-    final smallDetails = smallTxns.map((txn) => _buildSmallTxnInfo(txn)).toList();
+    final smallDetails = smallTxns
+        .map((txn) => _buildSmallTxnInfo(txn))
+        .toList();
 
     // Calculate totals
     final subscriptionMonthly = subscriptions.fold<double>(
@@ -98,20 +114,27 @@ class LeakDetectionService {
     if (subscriptions.isNotEmpty) {
       final subCount = subscriptions.length;
       final subTotal = subscriptionMonthly.toStringAsFixed(0);
-      suggestions.add('You have $subCount recurring charges totaling ~₹$subTotal/month');
+      suggestions.add(
+        'You have $subCount recurring charges totaling ~₹$subTotal/month',
+      );
       // Category breakdown
       final subByCategory = <String, double>{};
       for (final sub in subscriptions) {
         final cat = sub['category'] as String;
-        subByCategory[cat] = (subByCategory[cat] ?? 0) +
+        subByCategory[cat] =
+            (subByCategory[cat] ?? 0) +
             (sub['monthlyEstimate'] as num).toDouble();
       }
       for (final entry in subByCategory.entries) {
-        suggestions.add('${entry.key[0].toUpperCase() + entry.key.substring(1)}: ₹${entry.value.toStringAsFixed(0)}/month in recurring charges');
+        suggestions.add(
+          '${entry.key[0].toUpperCase() + entry.key.substring(1)}: ₹${entry.value.toStringAsFixed(0)}/month in recurring charges',
+        );
       }
     }
     if (smallTotal > 500) {
-      suggestions.add('Small transactions add up to ₹${smallTotal.toStringAsFixed(0)} — review and consolidate where possible');
+      suggestions.add(
+        'Small transactions add up to ₹${smallTotal.toStringAsFixed(0)} — review and consolidate where possible',
+      );
     }
 
     final totalMonthly = subscriptionMonthly + smallTotal / 3;
@@ -182,13 +205,11 @@ class LeakDetectionService {
   }
 
   /// Calculate monthly leak potential from transactions
-  Map<String, dynamic> calculateMonthlyLeakPotential(List<TransactionModel> transactions) {
+  Map<String, dynamic> calculateMonthlyLeakPotential(
+    List<TransactionModel> transactions,
+  ) {
     if (transactions.isEmpty) {
-      return {
-        'subscriptions': 0.0,
-        'smallTransactions': 0.0,
-        'total': 0.0,
-      };
+      return {'subscriptions': 0.0, 'smallTransactions': 0.0, 'total': 0.0};
     }
 
     // Detect leaks first
@@ -202,7 +223,9 @@ class LeakDetectionService {
   }
 
   /// Suggest actions to reduce leaks based on transaction patterns
-  List<String> suggestLeakReductionActions(List<TransactionModel> transactions) {
+  List<String> suggestLeakReductionActions(
+    List<TransactionModel> transactions,
+  ) {
     final leaks = detectLeaks(transactions);
     final suggestions = <String>[];
 
@@ -213,39 +236,53 @@ class LeakDetectionService {
       final Map<String, double> categoryTotals = {};
       for (final sub in subscriptions) {
         final category = sub['category'] as String? ?? 'miscellaneous';
-        final monthlyEstimate = (sub['monthlyEstimate'] as num?)?.toDouble() ?? 0.0;
-        categoryTotals[category] = (categoryTotals[category] ?? 0) + monthlyEstimate;
+        final monthlyEstimate =
+            (sub['monthlyEstimate'] as num?)?.toDouble() ?? 0.0;
+        categoryTotals[category] =
+            (categoryTotals[category] ?? 0) + monthlyEstimate;
       }
 
       // Add category-specific suggestions
       categoryTotals.forEach((category, amount) {
         if (amount > 1000) {
-          suggestions.add('Consider reviewing your $category subscriptions - you\'re spending ₹${amount.toStringAsFixed(0)}/month');
+          suggestions.add(
+            'Consider reviewing your $category subscriptions - you\'re spending ₹${amount.toStringAsFixed(0)}/month',
+          );
         } else if (amount > 500) {
-          suggestions.add('Your $category subscriptions total ₹${amount.toStringAsFixed(0)}/month - look for bundling opportunities');
+          suggestions.add(
+            'Your $category subscriptions total ₹${amount.toStringAsFixed(0)}/month - look for bundling opportunities',
+          );
         }
       });
 
       // General subscription suggestion
       final totalSubMonthly = leaks['subscriptionMonthly'] ?? 0.0;
       if (totalSubMonthly > 0) {
-        suggestions.add('You have ${subscriptions.length} recurring subscriptions totaling ₹${totalSubMonthly.toStringAsFixed(0)}/month');
+        suggestions.add(
+          'You have ${subscriptions.length} recurring subscriptions totaling ₹${totalSubMonthly.toStringAsFixed(0)}/month',
+        );
       }
     }
 
     // Small transactions suggestions
     final smallTotal = leaks['smallMonthly'] ?? 0.0;
     if (smallTotal > 500) {
-      suggestions.add('Small transactions under ₹200 total ₹${smallTotal.toStringAsFixed(0)}/month - consider setting a weekly cash limit');
+      suggestions.add(
+        'Small transactions under ₹200 total ₹${smallTotal.toStringAsFixed(0)}/month - consider setting a weekly cash limit',
+      );
     } else if (smallTotal > 200) {
-      suggestions.add('Monitor small daily expenses - they add up to ₹${smallTotal.toStringAsFixed(0)}/month');
+      suggestions.add(
+        'Monitor small daily expenses - they add up to ₹${smallTotal.toStringAsFixed(0)}/month',
+      );
     }
 
     // If no significant leaks found
     if (suggestions.isEmpty) {
       final totalLeak = leaks['totalMonthly'] ?? 0.0;
       if (totalLeak > 0) {
-        suggestions.add('Your spending looks healthy! Keep monitoring for any new recurring charges.');
+        suggestions.add(
+          'Your spending looks healthy! Keep monitoring for any new recurring charges.',
+        );
       } else {
         suggestions.add('Great job! No significant spending leaks detected.');
       }

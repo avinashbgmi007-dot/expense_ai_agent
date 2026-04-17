@@ -40,29 +40,37 @@ class _HomeScreenState extends State<HomeScreen> {
       if (file == null) return;
 
       final ext = file.path.split('.').last.toLowerCase();
-      List transactions;
+      List transactions = [];
 
-      switch (ext) {
-        case 'csv':
-          transactions = await _csvParserService.parseCSV(file);
-          break;
-        case 'pdf':
-          transactions = await _pdfParserService.parsePDF(file);
-          break;
-        case 'xlsx':
-        case 'xls':
-          transactions = await _xlsxParserService.parseXLSX(file);
-          break;
-        default:
+      if (ext == 'csv') {
+        transactions = await _csvParserService.parseCSV(file);
+      } else if (ext == 'pdf') {
+        transactions = await _pdfParserService.parsePDF(file);
+      } else if (ext == 'xlsx' || ext == 'xls') {
+        transactions = await _xlsxParserService.parseXLSX(file);
+        if (ext == 'xls' && transactions.isEmpty) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('\u274C Unsupported file format'),
+                content: Text(
+                  '\u{1F6AB} Older XLS format is not supported. Try XLSX.',
+                ),
                 backgroundColor: Colors.red,
               ),
             );
           }
           return;
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('\u274C Unsupported file format'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
       }
 
       if (!mounted) return;
@@ -70,7 +78,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (transactions.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('\u274C No valid transactions found in $ext file'),
+            content: Text(
+              '\u274C No valid transactions found in ${ext.toUpperCase()} file',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -116,7 +126,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Expense AI Agent', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+        title: const Text(
+          'Expense AI Agent',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -166,11 +179,20 @@ class _HomeScreenState extends State<HomeScreen> {
           final totalSpend = provider.data['totalSpend'] as double? ?? 0.0;
           final txnCount = provider.data['transactionCount'] as int? ?? 0;
 
-          final spendByCategory = provider.data['spendByCategory'] as Map<String, double>? ?? {};
-          final spendByMerchant = provider.data['spendByMerchant'] as Map<String, double>? ?? {};
+          final spendByCategory = provider.data['spendByCategory'] is Map
+              ? provider.getSpendingByCategory()
+              : <String, dynamic>{};
+          final spendByMerchantRaw = provider.data['spendByMerchant'];
+          final spendByMerchant = spendByMerchantRaw is Map
+              ? Map<String, double>.from(
+                  spendByMerchantRaw.map(
+                      (k, v) => MapEntry(k.toString(), (v as num).toDouble())),
+                )
+              : <String, double>{};
 
           final leaks = provider.data['leaks'] as Map<String, dynamic>? ?? {};
-          final subscriptions = provider.data['subscriptions'] as List<dynamic>? ?? [];
+          final subscriptions =
+              provider.data['subscriptions'] as List<dynamic>? ?? [];
           final insights = provider.data['insights'] as List<dynamic>? ?? [];
 
           final isEmpty = txnCount == 0;
@@ -182,25 +204,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildSummaryCard(totalSpend, txnCount),
                     const SizedBox(height: 16),
-
                     if (spendByCategory.isNotEmpty)
                       _buildCategoryCard(spendByCategory, totalSpend),
                     const SizedBox(height: 16),
-
                     if (spendByMerchant.isNotEmpty)
                       _buildMerchantCard(spendByMerchant),
                     const SizedBox(height: 16),
-
                     if (subscriptions.isNotEmpty)
                       _buildSubscriptionsCard(subscriptions),
                     const SizedBox(height: 16),
-
-                    if (leaks.isNotEmpty && (leaks['total'] ?? 0) > 0)
-                      _buildLeaksCard(leaks),
+                    if (leaks.isNotEmpty) _buildLeaksCard(leaks),
                     const SizedBox(height: 16),
-
-                    if (insights.isNotEmpty)
-                      _buildInsightsCard(insights),
+                    if (insights.isNotEmpty) _buildInsightsCard(insights),
                   ],
                 );
         },
@@ -359,7 +374,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoryCard(Map<String, double> spendByCategory, double totalSpend) {
+  Widget _buildCategoryCard(
+    Map<String, dynamic> spendByCategory,
+    double totalSpend,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppTheme.cardDecoration(),
@@ -374,7 +392,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppTheme.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.pie_chart, size: 20, color: AppTheme.primaryColor),
+                child: const Icon(
+                  Icons.pie_chart,
+                  size: 20,
+                  color: AppTheme.primaryColor,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -385,8 +407,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
           ...spendByCategory.entries.map((entry) {
-            final percentage = (totalSpend > 0 ? (entry.value / totalSpend * 100) : 0.0);
-            final color = AppTheme.categoryColors[entry.key.toLowerCase()] ?? AppTheme.primaryColor;
+            final percentage =
+                (totalSpend > 0 ? (entry.value / totalSpend * 100) : 0.0);
+            final color = AppTheme.categoryColors[entry.key.toLowerCase()] ??
+                AppTheme.primaryColor;
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Column(
@@ -408,13 +432,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(width: 8),
                           Text(
                             entry.key.toUpperCase(),
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
                       Text(
                         '\u{20B9}${entry.value.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -452,7 +482,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppTheme.secondaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.store, size: 20, color: AppTheme.secondaryColor),
+                child: const Icon(
+                  Icons.store,
+                  size: 20,
+                  color: AppTheme.secondaryColor,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -462,7 +496,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          ...spendByMerchant.entries.toList().take(5).toList().asMap().entries.map((entry) {
+          ...spendByMerchant.entries.take(5).toList().asMap().entries.map((
+            entry,
+          ) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 5),
               child: Row(
@@ -489,7 +525,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     child: Text(
                       entry.value.key,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                   Text(
@@ -521,10 +560,16 @@ class _HomeScreenState extends State<HomeScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.categoryColors['subscriptions']!.withOpacity(0.1),
+                  color: AppTheme.categoryColors['subscriptions']!.withOpacity(
+                    0.1,
+                  ),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.autorenew, size: 20, color: AppTheme.secondaryColor),
+                child: const Icon(
+                  Icons.autorenew,
+                  size: 20,
+                  color: AppTheme.secondaryColor,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -534,7 +579,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          for (int i = 0; i < (subscriptions.length > 5 ? 5 : subscriptions.length); i++)
+          for (int i = 0;
+              i < (subscriptions.length > 5 ? 5 : subscriptions.length);
+              i++)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
@@ -556,7 +603,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   Text(
                     '\u{20B9}${(subscriptions[i]['amount'] ?? 0).toStringAsFixed(2)}/mo',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -567,6 +617,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLeaksCard(Map<String, dynamic> leaks) {
+    final subscriptionData = leaks['subscriptions'] as List<dynamic>? ?? [];
+    final smallTxnData = leaks['smallTransactions'] as List<dynamic>? ?? [];
+    final subscriptionTotal = subscriptionData.length;
+    final smallTxnTotal = smallTxnData.length;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppTheme.cardDecoration(color: Colors.orange.shade50),
@@ -581,34 +636,55 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.orange.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.warning_amber_rounded, size: 20, color: Colors.orange),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 20,
+                  color: Colors.orange,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
                 'Spending Leaks',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.orange),
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _leakRow('Subscriptions', leaks['subscriptions'] ?? 0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Subscriptions', style: TextStyle(fontSize: 14)),
+              Text(
+                '\u{20B9}${subscriptionTotal.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
-          _leakRow('Small Transactions', leaks['smallTransactions'] ?? 0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Small Transactions', style: TextStyle(fontSize: 14)),
+              Text(
+                '\u{20B9}${smallTxnTotal.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _leakRow(String label, double amount) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 14)),
-        Text(
-          '\u{20B9}${amount.toStringAsFixed(2)}',
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.orange),
-        ),
-      ],
     );
   }
 
@@ -627,7 +703,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppTheme.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.lightbulb_outline, size: 20, color: AppTheme.primaryColor),
+                child: const Icon(
+                  Icons.lightbulb_outline,
+                  size: 20,
+                  color: AppTheme.primaryColor,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(

@@ -6,28 +6,30 @@ class TransactionProvider with ChangeNotifier {
   final DatabaseService _databaseService;
 
   TransactionProvider({DatabaseService? databaseService})
-      : _databaseService = databaseService ?? DatabaseService();
+    : _databaseService = databaseService ?? DatabaseService();
 
   bool _isLoading = false;
   String? _error;
-  List<Transaction> _transactions = [];
+  List<TransactionModel> _transactions = [];
   TransactionFilter _currentFilter = TransactionFilter();
 
   // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
-  List<Transaction> get transactions => _transactions;
+  List<TransactionModel> get transactions => _transactions;
   TransactionFilter get currentFilter => _currentFilter;
 
   // Computed properties
-  double get totalAmount => _transactions.fold(0.0, (sum, tx) => sum + tx.amount);
+  double get totalAmount =>
+      _transactions.fold(0.0, (sum, tx) => sum + tx.amount);
   int get transactionCount => _transactions.length;
 
   Map<String, double> get spendingByCategory {
     final categoryTotals = <String, double>{};
     for (final transaction in _transactions) {
       final category = transaction.category;
-      categoryTotals[category] = (categoryTotals[category] ?? 0) + transaction.amount;
+      categoryTotals[category] =
+          (categoryTotals[category] ?? 0) + transaction.amount;
     }
     return categoryTotals;
   }
@@ -40,15 +42,8 @@ class TransactionProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final loadedTransactions = await _databaseService.getTransactions(
-        accountId: _currentFilter.accountId,
-        category: _currentFilter.category,
-        startDate: _currentFilter.startDate,
-        endDate: _currentFilter.endDate,
-        searchQuery: _currentFilter.searchQuery,
-        limit: _currentFilter.limit,
-        offset: _currentFilter.offset,
-      );
+      await _databaseService.initialize();
+      final loadedTransactions = _databaseService.getTransactions();
 
       _transactions = loadedTransactions;
     } catch (e) {
@@ -61,14 +56,14 @@ class TransactionProvider with ChangeNotifier {
   }
 
   // Add a new transaction
-  Future<void> addTransaction(Transaction transaction) async {
+  Future<void> addTransaction(TransactionModel transaction) async {
     try {
-      final id = await _databaseService.insertTransaction(transaction);
-      final newTransaction = transaction.copyWith(id: id);
+      await _databaseService.initialize();
+      await _databaseService.insertTransaction(transaction);
 
       // Add to local list if it matches current filter
-      if (_matchesFilter(newTransaction)) {
-        _transactions.insert(0, newTransaction);
+      if (_matchesFilter(transaction)) {
+        _transactions.add(transaction);
         notifyListeners();
       }
     } catch (e) {
@@ -79,7 +74,7 @@ class TransactionProvider with ChangeNotifier {
   }
 
   // Update an existing transaction
-  Future<void> updateTransaction(Transaction transaction) async {
+  Future<void> updateTransaction(TransactionModel transaction) async {
     try {
       await _databaseService.updateTransaction(transaction);
 
@@ -103,7 +98,7 @@ class TransactionProvider with ChangeNotifier {
   }
 
   // Delete a transaction
-  Future<void> deleteTransaction(int id) async {
+  Future<void> deleteTransaction(String id) async {
     try {
       await _databaseService.deleteTransaction(id);
 
@@ -118,16 +113,11 @@ class TransactionProvider with ChangeNotifier {
   }
 
   // Bulk add transactions
-  Future<void> addTransactions(List<Transaction> transactions) async {
+  Future<void> addTransactions(List<TransactionModel> transactions) async {
     try {
-      final ids = await _databaseService.insertTransactions(transactions);
-
-      // Add to local list with assigned IDs
-      for (var i = 0; i < transactions.length; i++) {
-        final transaction = transactions[i].copyWith(id: ids[i]);
-        if (_matchesFilter(transaction)) {
-          _transactions.insert(0, transaction);
-        }
+      for (final transaction in transactions) {
+        await _databaseService.insertTransaction(transaction);
+        _transactions.add(transaction);
       }
 
       notifyListeners();
@@ -139,20 +129,23 @@ class TransactionProvider with ChangeNotifier {
   }
 
   // Get transaction by ID
-  Future<Transaction?> getTransaction(int id) async {
+  Future<TransactionModel?> getTransaction(String id) async {
     try {
       // First check local list
-      final localTransaction = _transactions.cast<Transaction?>().firstWhere(
-            (tx) => tx?.id == id,
-            orElse: () => null,
-          );
-
-      if (localTransaction != null) {
-        return localTransaction;
+      final localIndex = _transactions.indexWhere((tx) => tx.id == id);
+      if (localIndex != -1) {
+        return _transactions[localIndex];
       }
 
       // Otherwise fetch from database
-      return await _databaseService.getTransaction(id);
+      await _databaseService.initialize();
+      final allTransactions = _databaseService.getTransactions();
+      final dbIndex = allTransactions.indexWhere((tx) => tx.id == id);
+      if (dbIndex != -1) {
+        return allTransactions[dbIndex];
+      }
+
+      return null;
     } catch (e) {
       _error = 'Failed to get transaction: $e';
       notifyListeners();
@@ -167,7 +160,7 @@ class TransactionProvider with ChangeNotifier {
 
   // Clear current filter
   Future<void> clearFilter() async {
-    await loadTransactions(filter: TransactionFilter());
+    await loadTransactions(filter: _currentFilter);
   }
 
   // Refresh current data
@@ -176,24 +169,12 @@ class TransactionProvider with ChangeNotifier {
   }
 
   // Check if transaction matches current filter
-  bool _matchesFilter(Transaction transaction) {
-    if (_currentFilter.accountId != null &&
-        transaction.accountId != _currentFilter.accountId) {
-      return false;
-    }
+  bool _matchesFilter(TransactionModel transaction) {
+    // Note: TransactionModel doesn't have accountId, date properties
+    // We'll filter based on category and search query only
 
     if (_currentFilter.category != null &&
         transaction.category != _currentFilter.category) {
-      return false;
-    }
-
-    if (_currentFilter.startDate != null &&
-        transaction.date.isBefore(_currentFilter.startDate!)) {
-      return false;
-    }
-
-    if (_currentFilter.endDate != null &&
-        transaction.date.isAfter(_currentFilter.endDate!)) {
       return false;
     }
 

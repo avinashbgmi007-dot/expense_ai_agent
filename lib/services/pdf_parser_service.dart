@@ -213,12 +213,12 @@ class PDFParserService {
           // Try to find the transaction block after this date
           // Format: Date -> TransID -> Remarks -> Amount\(Dr/Cr\) -> Balance\(Cr\)
           // TransId can be: S90880893 (S + digits), AA289254 (AA + digits), ST6001150 (ST + digits)
-          final transIdRx = RegExp(r'^[A-Z]+(\d{5,}|T\d{5,})$', caseSensitive: false);
+          final transIdRx =
+              RegExp(r'^[A-Z]+(\d{5,}|T\d{5,})$', caseSensitive: false);
           int refIdx = i + 1;
 
           // Skip to find transaction ID
-          while (refIdx < lines.length &&
-              !transIdRx.hasMatch(lines[refIdx])) {
+          while (refIdx < lines.length && !transIdRx.hasMatch(lines[refIdx])) {
             refIdx++;
             if (refIdx >= i + 4) break; // too far, not a valid transaction
           }
@@ -253,9 +253,11 @@ class PDFParserService {
                       final lr = remarks.toLowerCase();
                       if (remarks.contains('CASH')) {
                         merchant = 'Cash';
-                      } else if (remarks.startsWith('BY ') || remarks.startsWith('FRM ')) {
+                      } else if (remarks.startsWith('BY ') ||
+                          remarks.startsWith('FRM ')) {
                         merchant = 'Bank Transfer';
-                      } else if (remarks.contains('Int.Pd:') || lr.contains('interest')) {
+                      } else if (remarks.contains('Int.Pd:') ||
+                          lr.contains('interest')) {
                         merchant = 'Interest';
                       } else if (lr.contains('sms')) {
                         merchant = 'SMS Charges';
@@ -373,7 +375,8 @@ class PDFParserService {
     if (lower.contains('dummy na') || lower.contains('dummy')) {
       // Use the bank from the transaction instead
       final bankMatch = RegExp(r'/(punb|sbin|anndb|hdfc|barb|axis|utib|andb)/',
-          caseSensitive: false).firstMatch(remarks);
+              caseSensitive: false)
+          .firstMatch(remarks);
       if (bankMatch != null) {
         return '${bankMatch.group(1)?.toUpperCase()} transfer';
       }
@@ -382,7 +385,8 @@ class PDFParserService {
 
     // Bank internal transfer (from/to own account)
     final bankMatch = RegExp(r'/(punb|sbin|anndb|hdfc|barb|axis|utib|andb)/',
-        caseSensitive: false).firstMatch(remarks);
+            caseSensitive: false)
+        .firstMatch(remarks);
     if (bankMatch != null) {
       return '${bankMatch.group(1)?.toUpperCase()} transfer';
     }
@@ -610,10 +614,21 @@ class PDFParserService {
   // =========================================================================
 
   String _extractMerchant(String text) {
+    // CAPGEMINI specific detection at the start
+    final capgeminiSalaryRx = RegExp(
+      r'(?:CR-\S+).*CAPGEMINI.*(?:SALARY|CREDIT)',
+      caseSensitive: false,
+    );
+    if (capgeminiSalaryRx.hasMatch(text)) {
+      return 'Capgemini Salary';
+    }
+
     final lower = text.toLowerCase();
 
     final known = {
-      'capgemini': 'capgemini',
+      'capgemini': 'Capgemini Salary',
+      'capgemini salary': 'Capgemini Salary',
+      'cappgemini': 'Capgemini Salary',
       'google india': 'google india',
       'google india digital': 'google india',
       'google pay': 'google pay',
@@ -690,8 +705,17 @@ class PDFParserService {
       for (final token in name.split(RegExp(r'\s+'))) {
         final tl = token.toLowerCase();
         if (tl.contains('@') ||
-            ['gpay', 'okbiz', 'okicici', 'okaxis', 'oksbi', 'okhdfcbank',
-              'bharatpe', 'paytm', 'pzhdfc'].any((p) => tl.contains(p))) {
+            [
+              'gpay',
+              'okbiz',
+              'okicici',
+              'okaxis',
+              'oksbi',
+              'okhdfcbank',
+              'bharatpe',
+              'paytm',
+              'pzhdfc'
+            ].any((p) => tl.contains(p))) {
           break;
         }
         cleanParts.add(token);
@@ -718,12 +742,38 @@ class PDFParserService {
       if (clean.length >= 3 &&
           clean.length <= 30 &&
           !RegExp(r'\d').hasMatch(token) &&
-          ![
-            'upi', 'neft', 'rtgs', 'bhim', 'gpay', 'cashback', 'hdfcbank',
-            'hdfc', 'npci', 'norem', 'remarks', 'potential', 'residents',
-            'salary', 'account', 'statement', 'from', 'city', 'state',
-            'pay', 'to', 'cr', 'feb', 'scblh', 'services', 'india',
-            'avinash', 'technology', 'mab', 'uboi', 'yesbank',
+          [
+            'upi',
+            'neft',
+            'rtgs',
+            'bhim',
+            'gpay',
+            'cashback',
+            'hdfcbank',
+            'hdfc',
+            'npci',
+            'norem',
+            'remarks',
+            'potential',
+            'residents',
+            'salary',
+            'account',
+            'statement',
+            'from',
+            'city',
+            'state',
+            'pay',
+            'to',
+            'cr',
+            'feb',
+            'scblh',
+            'services',
+            'india',
+            'avinash',
+            'technology',
+            'mab',
+            'uboi',
+            'yesbank',
           ].contains(clean)) {
         return clean[0].toUpperCase() + clean.substring(1);
       }
@@ -777,8 +827,7 @@ class PDFParserService {
       if (merchant.isEmpty) return null;
 
       return TransactionModel(
-        id:
-            '${date.millisecondsSinceEpoch}_${merchant.hashCode}_$amount',
+        id: '${date.millisecondsSinceEpoch}_${merchant.hashCode}_$amount',
         timestamp: date.millisecondsSinceEpoch,
         amount: amount,
         currency: 'INR',
@@ -803,8 +852,7 @@ class PDFParserService {
   ) {
     final seen = <String>{};
     return txns.where((t) {
-      final key =
-          '${t.timestamp}-${t.amount.toStringAsFixed(2)}-${t.merchant}';
+      final key = '${t.timestamp}-${t.amount.toStringAsFixed(2)}-${t.merchant}';
       return seen.add(key);
     }).toList();
   }
